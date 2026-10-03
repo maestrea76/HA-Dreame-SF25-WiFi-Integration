@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
@@ -33,24 +34,33 @@ class DreameSF25ConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         return DreameSF25OptionsFlow(config_entry)
 
+    async def _async_validate(
+        self, email: str, password: str, region: str, did: str | None, errors: dict[str, str]
+    ) -> dict | None:
+        """Comprueba las credenciales; devuelve el dispositivo o rellena errors."""
+        client = DreameSF25Client(email, password, region)
+        try:
+            return await self.hass.async_add_executor_job(client.resolve_device, did)
+        except DreameAuthError:
+            errors["base"] = "invalid_auth"
+        except DreameApiError:
+            errors["base"] = "cannot_connect"
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Error inesperado en config flow")
+            errors["base"] = "unknown"
+        return None
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            client = DreameSF25Client(
+            device = await self._async_validate(
                 user_input[CONF_EMAIL],
                 user_input[CONF_PASSWORD],
                 user_input[CONF_REGION],
+                None,
+                errors,
             )
-            try:
-                device = await self.hass.async_add_executor_job(client.resolve_device)
-            except DreameAuthError:
-                errors["base"] = "invalid_auth"
-            except DreameApiError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Error inesperado en config flow")
-                errors["base"] = "unknown"
-            else:
+            if device is not None:
                 did = str(device.get("did"))
                 await self.async_set_unique_id(did)
                 self._abort_if_unique_id_configured()
@@ -75,6 +85,35 @@ class DreameSF25ConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """La nube rechazo la contrasena guardada."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pide la contrasena nueva y recarga la entrada."""
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            device = await self._async_validate(
+                entry.data[CONF_EMAIL],
+                user_input[CONF_PASSWORD],
+                entry.data.get(CONF_REGION, DEFAULT_REGION),
+                entry.data.get(CONF_DID),
+                errors,
+            )
+            if device is not None:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}
+                )
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            description_placeholders={"email": entry.data[CONF_EMAIL]},
+            errors=errors,
+        )
 
 
 class DreameSF25OptionsFlow(OptionsFlow):

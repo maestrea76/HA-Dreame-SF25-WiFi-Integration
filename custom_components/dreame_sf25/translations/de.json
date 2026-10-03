@@ -9,6 +9,13 @@
           "password": "Passwort",
           "region": "Region"
         }
+      },
+      "reauth_confirm": {
+        "title": "Dreame SF25",
+        "description": "Die Dreame-Cloud hat das Passwort für {email} abgelehnt. Bitte das aktuelle Passwort eingeben.",
+        "data": {
+          "password": "Passwort"
+        }
       }
     },
     "error": {
@@ -17,7 +24,8 @@
       "unknown": "Unerwarteter Fehler."
     },
     "abort": {
-      "already_configured": "Dieses Gerät ist bereits eingerichtet."
+      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Anmeldung erfolgreich."
     }
   },
   "entity": {
