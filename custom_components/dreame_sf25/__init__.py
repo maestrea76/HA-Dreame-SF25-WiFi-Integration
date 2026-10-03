@@ -4,8 +4,13 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    EVENT_HOMEASSISTANT_STOP,
+    Platform,
+)
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
 from .api import DreameApiError, DreameAuthError, DreameSF25Client
@@ -48,6 +53,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: DreameSF25ConfigEntry) -
     await coordinator.async_config_entry_first_refresh()
     # push en tiempo real; si falla, el coordinator sigue sondeando
     await coordinator.async_start_push()
+
+    # al parar HA no se descargan las entradas: sin esto el hilo de paho sigue
+    # vivo, bloquea el cierre y empuja datos a un loop ya cerrado
+    async def _async_stop_push(_event: Event) -> None:
+        await coordinator.async_stop_push()
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_stop_push)
+    )
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
