@@ -143,7 +143,10 @@ class DreameSF25Mqtt:
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_message
-        client.connect(host, int(port), keepalive=60)
+        # connect_async + loop_start: si la nube no responde al arrancar, el
+        # hilo de paho reintenta solo (con connect() la excepcion mataba el push
+        # hasta recargar la integracion)
+        client.connect_async(host, int(port), keepalive=60)
         client.loop_start()
         self._client = client
 
