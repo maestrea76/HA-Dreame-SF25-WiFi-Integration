@@ -23,12 +23,20 @@ from .const import (
     BASIC_AUTH,
     DEFAULT_TENANT,
     PORT,
+    PROP_CHILD_LOCK,
+    PROP_STATUS,
     PWD_SALT,
     TARGET_MODEL,
     USER_AGENT,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Tras el code 1 el aparato puede tardar mas de un segundo en salir de
+# suspension, y la RPC de despertar a menudo caduca aunque el cambio llegue.
+WAKE_WAIT_SECONDS = 12.0
+WAKE_POLL_INTERVAL = 2.0
+_SUSPENDED_STATUS = 3
 
 # Verificacion TLS completa: los seis endpoints regionales presentan un
 # certificado publicamente valido (CN=*.iot.dreame.tech, DigiCert). Por aqui
@@ -246,29 +254,63 @@ class DreameSF25Client:
         """Despierta el aparato de suspension (accion MIoT 2/1)."""
         self.run_action(*ACTION_WAKE)
 
+    def _read_status(self) -> int | None:
+        """Lee 2.1. None si la nube no devuelve un entero."""
+        try:
+            raw = self.get_properties([PROP_STATUS]).get(PROP_STATUS)
+            return int(raw)
+        except (DreameApiError, TypeError, ValueError) as err:
+            _LOGGER.debug("No se pudo leer el estado al despertar: %s", err)
+            return None
+
+    def _wake_and_wait(self) -> bool:
+        """Despierta y sondea hasta que el estado deja de ser suspension.
+
+        Devuelve True si se ha visto un estado distinto de suspension.
+        """
+        try:
+            self.wake()
+        except DreameApiError as err:
+            # The wake RPC can time out even though the device transitions
+            # to standby. The following status polls decide whether it did.
+            _LOGGER.debug("Wake RPC was not acknowledged: %s", err)
+        deadline = time.monotonic() + WAKE_WAIT_SECONDS
+        while True:
+            status = self._read_status()
+            if status is not None and status != _SUSPENDED_STATUS:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(WAKE_POLL_INTERVAL, remaining))
+
     def set_property(self, siid: int, piid: int, value: Any) -> Any:
         """Escribe una propiedad (siid,piid)=value.
 
         El SF25 devuelve code 1 (y no aplica) cuando esta en suspension (2.1=3).
-        En ese caso ejecutamos la accion de despertar y reintentamos una vez.
-        Si aun asi falla, lanzamos error para que HA lo muestre.
+        En ese caso despertamos y esperamos a que el estado cambie antes de
+        reintentar la escritura una vez.
         """
         entry, code = self._set_once(siid, piid, value)
+        awake = True
         if code == 1:
-            try:
-                self.wake()
-            except DreameApiError as err:
-                # The wake RPC can time out even though the device transitions
-                # to standby. The acknowledgement of the retried write is the
-                # authoritative outcome for this command.
-                _LOGGER.debug("Wake RPC was not acknowledged: %s", err)
-            time.sleep(1.5)
+            awake = self._wake_and_wait()
             entry, code = self._set_once(siid, piid, value)
-        if code != 0:
+        if code == 0:
+            return entry
+        if (siid, piid) == PROP_CHILD_LOCK and awake and code == 1:
             raise DreameApiError(
-                f"Escritura {siid}.{piid}={value} rechazada (code {code})."
+                "El SF25 ha rechazado el bloqueo infantil. "
+                "Solo tiene efecto con un ciclo en marcha."
             )
-        return entry
+        if not awake:
+            raise DreameApiError(
+                f"Escritura {siid}.{piid}={value} rechazada: "
+                "el aparato sigue en suspension."
+            )
+        raise DreameApiError(
+            f"Escritura {siid}.{piid}={value} rechazada (code {code})."
+        )
 
     def run_action(self, siid: int, aiid: int, in_args: list | None = None) -> Any:
         """Ejecuta una accion MIoT. Tolera respuestas sin 'result'."""

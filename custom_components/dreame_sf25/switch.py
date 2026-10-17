@@ -9,11 +9,13 @@ from homeassistant.components.switch import (
     SwitchEntityDescription,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DreameSF25ConfigEntry
+from .api import DreameApiError
 from .const import DOMAIN, PROP_CHILD_LOCK, PROP_SILENT_MODE, TARGET_MODEL
 from .coordinator import DreameSF25Coordinator
 
@@ -91,9 +93,12 @@ class DreameSF25Switch(CoordinatorEntity[DreameSF25Coordinator], SwitchEntity):
 
     async def _async_set(self, value: int) -> None:
         siid, piid = self.entity_description.prop
-        await self.hass.async_add_executor_job(
-            self.coordinator.client.set_property, siid, piid, value
-        )
+        try:
+            await self.hass.async_add_executor_job(
+                self.coordinator.client.set_property, siid, piid, value
+            )
+        except DreameApiError as err:
+            raise HomeAssistantError(str(err)) from err
         await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs: Any) -> None:

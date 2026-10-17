@@ -19,6 +19,7 @@ for name in ('const', 'api'):
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
 api = sys.modules['dreame_sf25.api']
+const = sys.modules['dreame_sf25.const']
 
 class ApiSafetyTests(unittest.TestCase):
     def setUp(self):
@@ -36,15 +37,68 @@ class ApiSafetyTests(unittest.TestCase):
     def test_sleeping_device_is_woken_and_write_retried_once(self):
         self.client._set_once = Mock(side_effect=[({'code': 1}, 1), ({'code': 0}, 0)])
         self.client.wake = Mock()
-        with patch.object(api.time, 'sleep'):
+        self.client.get_properties = Mock(return_value={const.PROP_STATUS: 2})
+        with patch.object(api.time, 'sleep') as sleep:
             result = self.client.set_property(6, 17, 1)
         self.assertEqual(result['code'], 0)
         self.client.wake.assert_called_once()
         self.assertEqual(self.client._set_once.call_count, 2)
+        sleep.assert_not_called()
+
+    def test_write_waits_until_device_leaves_suspend(self):
+        self.client._set_once = Mock(side_effect=[({'code': 1}, 1), ({'code': 0}, 0)])
+        self.client.wake = Mock()
+        self.client.get_properties = Mock(side_effect=[
+            {const.PROP_STATUS: 3},
+            {const.PROP_STATUS: 3},
+            {const.PROP_STATUS: 2},
+        ])
+        clock = {'t': 0.0}
+
+        def monotonic():
+            return clock['t']
+
+        def sleep(seconds):
+            clock['t'] += seconds
+
+        with patch.object(api.time, 'monotonic', monotonic), patch.object(api.time, 'sleep', sleep):
+            result = self.client.set_property(6, 17, 1)
+        self.assertEqual(result['code'], 0)
+        self.assertEqual(self.client.get_properties.call_count, 3)
+        self.assertGreater(clock['t'], 0)
+
+    def test_child_lock_rejected_while_awake_names_the_reason(self):
+        self.client._set_once = Mock(return_value=({'code': 1}, 1))
+        self.client.wake = Mock()
+        self.client.get_properties = Mock(return_value={const.PROP_STATUS: 2})
+        with patch.object(api.time, 'sleep'), self.assertRaises(api.DreameApiError) as raised:
+            self.client.set_property(6, 10, 1)
+        self.assertIn('bloqueo infantil', str(raised.exception))
+        self.assertIn('ciclo en marcha', str(raised.exception))
+
+    def test_write_rejected_when_device_stays_suspended(self):
+        self.client._set_once = Mock(return_value=({'code': 1}, 1))
+        self.client.wake = Mock()
+        self.client.get_properties = Mock(return_value={const.PROP_STATUS: 3})
+        clock = {'t': 0.0}
+
+        def monotonic():
+            return clock['t']
+
+        def sleep(seconds):
+            clock['t'] += seconds
+
+        with patch.object(api.time, 'monotonic', monotonic), patch.object(api.time, 'sleep', sleep):
+            with self.assertRaises(api.DreameApiError) as raised:
+                self.client.set_property(6, 10, 1)
+        self.assertIn('suspension', str(raised.exception))
+        self.assertNotIn('ciclo en marcha', str(raised.exception))
+        self.assertGreaterEqual(clock['t'], api.WAKE_WAIT_SECONDS)
 
     def test_wake_timeout_does_not_hide_successful_retried_write(self):
         self.client._set_once = Mock(side_effect=[({'code': 1}, 1), ({'code': 0}, 0)])
         self.client.wake = Mock(side_effect=api.DreameApiError('cloud timeout'))
+        self.client.get_properties = Mock(return_value={const.PROP_STATUS: 2})
         with patch.object(api.time, 'sleep'):
             result = self.client.set_property(2, 3, 0)
         self.assertEqual(result['code'], 0)
