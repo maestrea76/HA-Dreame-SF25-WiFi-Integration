@@ -100,8 +100,6 @@ class DreameSF25Button(CoordinatorEntity[DreameSF25Coordinator], ButtonEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        if description.key == "wake":
-            self._attr_entity_registry_enabled_default = False
         did = coordinator.client.did
         self._attr_unique_id = f"{did}_{description.key}"
         self._attr_device_info = DeviceInfo(
@@ -124,8 +122,11 @@ class DreameSF25Button(CoordinatorEntity[DreameSF25Coordinator], ButtonEntity):
                 return int(data[PROP_RUNNING]) == 0
             if key == "open_lid":
                 return can_open_lid(data)
+            # Despertar se deja siempre accionable. La accion 2/1 es la que
+            # saca al aparato de suspension; ocultarla fuera de ese estado
+            # impedia pulsarla cuando el usuario la necesitaba.
             if key == "wake":
-                return int(data[PROP_STATUS]) == 3
+                return True
         except (KeyError, TypeError, ValueError):
             return False
         return True
