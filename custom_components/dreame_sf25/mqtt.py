@@ -17,6 +17,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 import ssl
 from collections.abc import Callable
 from typing import Any
@@ -116,8 +117,12 @@ class DreameSF25Mqtt:
     def start(self) -> None:
         """Conecta y arranca el bucle en segundo plano (llamar en executor)."""
         host, _, port = (self._api.bind_host or "").partition(":")
-        if not host or not port:
-            raise ValueError(f"bindDomain invalido: {self._api.bind_host!r}")
+        if (
+            not re.fullmatch(r"[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.iot\.dreame\.tech", host)
+            or not port.isdecimal()
+            or not 1 <= int(port) <= 65535
+        ):
+            raise ValueError("Invalid Dreame MQTT endpoint")
 
         username, password = self._api.mqtt_credentials()
         client_id = f"p_{self._api.master_uid}_{_random_agent_id()}_{host}"

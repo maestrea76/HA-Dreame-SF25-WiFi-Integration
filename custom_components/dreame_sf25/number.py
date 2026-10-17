@@ -46,7 +46,7 @@ class DreameSF25LidCount(CoordinatorEntity[DreameSF25Coordinator], NumberEntity)
             identifiers={(DOMAIN, str(did))},
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
-            name="Dreame SF25",
+            name=coordinator.entry.title,
         )
 
     @property

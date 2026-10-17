@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import DreameApiError, DreameAuthError, DreameSF25Client
 from .const import (
+    CONF_SAFETY_STOP,
     EVENT_SAFETY_STOP,
     POLL_PROPERTIES,
     PROGRAM_OPTIONS,
@@ -73,7 +74,15 @@ class DreameSF25Coordinator(DataUpdateCoordinator[dict[tuple[int, int], Any]]):
 
     def _handle_push(self, updates: dict[tuple[int, int], Any]) -> None:
         """Llamado desde el hilo de paho: lo pasamos al loop de HA."""
-        self.hass.loop.call_soon_threadsafe(self._apply_push, updates)
+        # MQTT may deliver one final packet while HA is shutting down. In that
+        # narrow window the loop can close between the check and scheduling.
+        if self.hass.loop.is_closed():
+            return
+        try:
+            self.hass.loop.call_soon_threadsafe(self._apply_push, updates)
+        except RuntimeError:
+            if not self.hass.loop.is_closed():
+                raise
 
     @callback
     def _apply_push(self, updates: dict[tuple[int, int], Any]) -> None:
@@ -95,6 +104,8 @@ class DreameSF25Coordinator(DataUpdateCoordinator[dict[tuple[int, int], Any]]):
         Proteccion SECUNDARIA: depende de HA y de la nube, no sustituye al
         corte termico del propio aparato.
         """
+        if not self.entry.options.get(CONF_SAFETY_STOP, False):
+            return
         raw_temp = data.get(PROP_TEMPERATURE)
         raw_prog = data.get(PROP_PROGRAM)
         if raw_temp is None or raw_prog is None:

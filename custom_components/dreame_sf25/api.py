@@ -94,7 +94,7 @@ class DreameSF25Client:
         except urllib.error.HTTPError as e:
             raw = e.read().decode("utf-8", "replace")
             if e.code == 401:
-                raise DreameAuthError(raw) from e
+                raise DreameAuthError("Authentication rejected (HTTP 401)") from e
             raise DreameApiError(f"HTTP {e.code}: {raw[:200]}") from e
         except Exception as e:  # noqa: BLE001
             raise DreameApiError(str(e)) from e
@@ -121,17 +121,26 @@ class DreameSF25Client:
     def login(self) -> None:
         """Login por usuario/contrasena (grant password)."""
         pwd_hash = hashlib.md5((self._password + PWD_SALT).encode("utf-8")).hexdigest()
-        body = (
-            "platform=IOS&scope=all&grant_type=password"
-            f"&username={urllib.parse.quote(self._email)}"
-            f"&password={pwd_hash}&type=account"
+        body = urllib.parse.urlencode(
+            {
+                "platform": "IOS",
+                "scope": "all",
+                "grant_type": "password",
+                "username": self._email,
+                "password": pwd_hash,
+                "type": "account",
+            }
         )
         self._do_token(body)
 
     def _refresh(self) -> None:
-        body = (
-            "platform=IOS&scope=all&grant_type=refresh_token"
-            f"&refresh_token={self._refresh_token}"
+        body = urllib.parse.urlencode(
+            {
+                "platform": "IOS",
+                "scope": "all",
+                "grant_type": "refresh_token",
+                "refresh_token": self._refresh_token or "",
+            }
         )
         self._do_token(body)
 
@@ -145,7 +154,7 @@ class DreameSF25Client:
         }
         data = self._post("/dreame-auth/oauth/token", headers, body.encode("utf-8"))
         if "access_token" not in data:
-            raise DreameAuthError(json.dumps(data)[:200])
+            raise DreameAuthError("Dreame did not return an access token")
         self._access_token = data["access_token"]
         self._refresh_token = data.get("refresh_token", self._refresh_token)
         self._tenant_id = data.get("tenant_id", DEFAULT_TENANT)
@@ -173,8 +182,9 @@ class DreameSF25Client:
         """Localiza el SF25 (o el did dado) y cachea did/bind_host/model."""
         for d in self.list_devices():
             model = d.get("model") or ""
-            match = (did is not None and str(d.get("did")) == str(did)) or (
-                did is None and (model == TARGET_MODEL or "u2527" in model)
+            supported = model == TARGET_MODEL or model.endswith(".u2527")
+            match = supported and (
+                did is None or str(d.get("did")) == str(did)
             )
             if match:
                 self.did = str(d.get("did"))
@@ -186,10 +196,13 @@ class DreameSF25Client:
 
     # ------------------------------------------------------------------ RPC
     def _rpc_path(self) -> str:
-        host = f"-{self.bind_host.split('.')[0]}" if self.bind_host else ""
+        shard = self.bind_host.split(".")[0] if self.bind_host else ""
+        if shard and not shard.isdecimal():
+            raise DreameApiError("Invalid Dreame cloud shard")
+        host = f"-{shard}" if shard else ""
         return f"/dreame-iot-com{host}/device/sendCommand"
 
-    def _send_rpc(self, method: str, params: Any) -> Any:
+    def _send_rpc(self, method: str, params: Any, *, allow_empty_success: bool = False) -> Any:
         self._ensure_token()
         self._rpc_id += 1
         body = {
@@ -200,6 +213,8 @@ class DreameSF25Client:
         resp = self._api(self._rpc_path(), body)
         if resp and isinstance(resp.get("data"), dict) and "result" in resp["data"]:
             return resp["data"]["result"]
+        if allow_empty_success and resp and resp.get("success") is True:
+            return None
         # 'success' sin data -> reintento unico
         if resp and resp.get("success") is True:
             resp = self._api(self._rpc_path(), body)
@@ -229,10 +244,7 @@ class DreameSF25Client:
 
     def wake(self) -> None:
         """Despierta el aparato de suspension (accion MIoT 2/1)."""
-        try:
-            self.run_action(*ACTION_WAKE)
-        except DreameApiError:
-            pass  # la accion puede no devolver 'result'; el reintento lo confirmara
+        self.run_action(*ACTION_WAKE)
 
     def set_property(self, siid: int, piid: int, value: Any) -> Any:
         """Escribe una propiedad (siid,piid)=value.
@@ -242,20 +254,23 @@ class DreameSF25Client:
         Si aun asi falla, lanzamos error para que HA lo muestre.
         """
         entry, code = self._set_once(siid, piid, value)
-        if code not in (0, None):
-            self.wake()
+        if code == 1:
+            try:
+                self.wake()
+            except DreameApiError as err:
+                # The wake RPC can time out even though the device transitions
+                # to standby. The acknowledgement of the retried write is the
+                # authoritative outcome for this command.
+                _LOGGER.debug("Wake RPC was not acknowledged: %s", err)
             time.sleep(1.5)
             entry, code = self._set_once(siid, piid, value)
-        if code not in (0, None):
+        if code != 0:
             raise DreameApiError(
-                f"Escritura {siid}.{piid}={value} rechazada (code {code}) incluso tras despertar."
+                f"Escritura {siid}.{piid}={value} rechazada (code {code})."
             )
         return entry
 
     def run_action(self, siid: int, aiid: int, in_args: list | None = None) -> Any:
         """Ejecuta una accion MIoT. Tolera respuestas sin 'result'."""
         params = {"did": str(self.did), "siid": siid, "aiid": aiid, "in": in_args or []}
-        try:
-            return self._send_rpc("action", params)
-        except DreameApiError:
-            return None
+        return self._send_rpc("action", params, allow_empty_success=True)

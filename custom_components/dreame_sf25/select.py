@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -15,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import DreameSF25ConfigEntry
 from .const import (
     DOMAIN,
+    CONF_VIRTUAL_MODES,
     PROGRAM_MAP,
     PROGRAM_OPTIONS,
     PROP_PROGRAM,
@@ -40,17 +42,21 @@ class DreameSF25ProgramSelect(CoordinatorEntity[DreameSF25Coordinator], SelectEn
     _attr_has_entity_name = True
     _attr_translation_key = "program"
     _attr_icon = "mdi:playlist-play"
-    _attr_options = list(SELECT_OPTIONS)
 
     def __init__(self, coordinator: DreameSF25Coordinator) -> None:
         super().__init__(coordinator)
+        self._attr_options = [
+            option for option in SELECT_OPTIONS
+            if option not in VIRTUAL_DURATIONS
+            or coordinator.entry.options.get(CONF_VIRTUAL_MODES, False)
+        ]
         did = coordinator.client.did
         self._attr_unique_id = f"{did}_program"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, str(did))},
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
-            name="Dreame SF25",
+            name=coordinator.entry.title,
         )
 
     @property
@@ -72,11 +78,14 @@ class DreameSF25ProgramSelect(CoordinatorEntity[DreameSF25Coordinator], SelectEn
         if option in VIRTUAL_DURATIONS:
             await modes.async_start_virtual(option)
             return
+        if option == "extra":
+            raise HomeAssistantError("Extra drying is started by the appliance, not manually")
 
-        # cambio a un modo real: cancelamos cualquier modo virtual en curso
-        await modes.async_clear_virtual()
         siid, piid = PROP_PROGRAM
         await self.hass.async_add_executor_job(
             self.coordinator.client.set_property, siid, piid, PROGRAM_OPTIONS[option]
         )
+        # Keep the expiry timer if the write fails: the virtual program still
+        # needs its scheduled stop.
+        await modes.async_clear_virtual()
         await self.coordinator.async_request_refresh()

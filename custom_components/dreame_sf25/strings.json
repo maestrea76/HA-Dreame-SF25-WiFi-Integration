@@ -102,5 +102,18 @@
         "name": "Hora de compactar"
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Acciones automáticas",
+        "description": "Ambas opciones están desactivadas por defecto. Los modos automáticos arrancan el aparato; la parada por temperatura puede interrumpir un programa. Requieren preparar el recipiente según el manual; usan el programa de autolimpieza.",
+        "data": {
+          "auto_modes": "Iniciar Remover/Compactar automáticamente",
+          "safety_stop": "Permitir parada por temperatura desde la nube",
+          "virtual_modes": "Habilitar modos cortos experimentales"
+        }
+      }
+    }
   }
 }

@@ -102,5 +102,18 @@
         "name": "Compact time"
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Automatic actions",
+        "description": "Both options are off by default. Automatic modes start the appliance after lid activity; the temperature stop can interrupt a running program. Prepare the container as instructed in the manual; these use self-clean.",
+        "data": {
+          "auto_modes": "Start Stir/Compact automatically",
+          "safety_stop": "Allow cloud temperature stop",
+          "virtual_modes": "Enable experimental short programs"
+        }
+      }
+    }
   }
 }

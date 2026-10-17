@@ -45,22 +45,6 @@ def _map_status(v: Any) -> str:
         return f"unknown_{v}"
 
 
-def _fmt_remaining(v: Any) -> str | None:
-    """Minutos -> '2h 34min' (o '45min' / '3h')."""
-    try:
-        m = int(v)
-    except (ValueError, TypeError):
-        return None
-    if m < 0:
-        return None
-    h, mm = divmod(m, 60)
-    if h and mm:
-        return f"{h}h {mm}min"
-    if h:
-        return f"{h}h"
-    return f"{mm}min"
-
-
 def _remaining_minutes(coordinator) -> int | None:
     """Minutos restantes de lo que realmente esta corriendo.
 
@@ -72,7 +56,8 @@ def _remaining_minutes(coordinator) -> int | None:
         return virtual
     raw = (coordinator.data or {}).get(PROP_REMAINING_TIME)
     try:
-        return int(raw)
+        minutes = int(raw)
+        return minutes if minutes >= 0 else None
     except (ValueError, TypeError):
         return None
 
@@ -109,11 +94,11 @@ SENSORS: tuple[DreameSF25SensorDescription, ...] = (
         translation_key="remaining_time",
         name="Remaining time",
         icon="mdi:timer-sand",
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
         prop=PROP_REMAINING_TIME,
-        coord_fn=lambda c: _fmt_remaining(_remaining_minutes(c)),
-        coord_attrs_fn=lambda c: (
-            None if _remaining_minutes(c) is None else {"minutes": _remaining_minutes(c)}
-        ),
+        coord_fn=_remaining_minutes,
     ),
     DreameSF25SensorDescription(
         key="energy",
@@ -194,7 +179,7 @@ class DreameSF25Sensor(CoordinatorEntity[DreameSF25Coordinator], SensorEntity):
             identifiers={(DOMAIN, str(did))},
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
-            name="Dreame SF25",
+            name=coordinator.entry.title,
         )
 
     @property

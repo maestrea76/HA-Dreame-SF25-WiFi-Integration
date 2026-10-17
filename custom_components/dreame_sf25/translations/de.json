@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dreame SF25",
+        "description": "Dreamehome-Zugangsdaten eingeben. Bei Anmeldung über Google zuerst in der App ein Passwort festlegen.",
+        "data": {
+          "email": "E-Mail",
+          "password": "Passwort",
+          "region": "Region"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Anmeldung fehlgeschlagen.",
+      "cannot_connect": "Dreame-Cloud oder SF25 nicht erreichbar.",
+      "unknown": "Unerwarteter Fehler."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "running": {
+        "name": "In Betrieb"
+      },
+      "lid": {
+        "name": "Deckel"
+      }
+    },
+    "button": {
+      "pause": {
+        "name": "Pausieren"
+      },
+      "resume": {
+        "name": "Fortsetzen"
+      },
+      "open_lid": {
+        "name": "Deckel öffnen"
+      },
+      "wake": {
+        "name": "Aufwecken"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Programm",
+        "state": {
+          "idle": "Aus",
+          "cycle": "Zerkleinern",
+          "self_clean": "Selbstreinigung",
+          "stir": "Rühren",
+          "compact": "Verdichten",
+          "extra": "Nachtrocknen"
+        }
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "working": "In Betrieb",
+          "standby": "Bereit",
+          "suspended": "Ruhezustand"
+        }
+      },
+      "remaining_time": {
+        "name": "Restzeit"
+      },
+      "energy": {
+        "name": "Energie pro Zyklus"
+      },
+      "carbon_filter_pct": {
+        "name": "Kohlefilter-Restlaufzeit"
+      },
+      "carbon_filter_days": {
+        "name": "Kohlefilter-Tage"
+      },
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "humidity": {
+        "name": "Feuchtigkeit"
+      }
+    },
+    "switch": {
+      "child_lock": {
+        "name": "Kindersicherung"
+      },
+      "silent_mode": {
+        "name": "Leisemodus"
+      }
+    },
+    "number": {
+      "lid_count": {
+        "name": "Deckelöffnungen"
+      }
+    },
+    "time": {
+      "compact_time": {
+        "name": "Uhrzeit für Verdichten"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Automatische Aktionen",
+        "description": "Beide Optionen sind zunächst aus. Automatische Modi starten das Gerät nach Deckelbewegungen; die Temperaturabschaltung kann ein laufendes Programm unterbrechen. Behälter nach Anleitung vorbereiten; die Kurzprogramme verwenden die Selbstreinigung.",
+        "data": {
+          "auto_modes": "Rühren/Verdichten automatisch starten",
+          "safety_stop": "Temperaturabschaltung über die Cloud erlauben",
+          "virtual_modes": "Experimentelle Kurzprogramme freigeben"
+        }
+      }
+    }
+  }
+}

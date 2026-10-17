@@ -33,10 +33,13 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_time_change
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CONF_AUTO_MODES,
+    CONF_VIRTUAL_MODES,
     COMMAND_GRACE,
     DEFAULT_COMPACT_HOUR,
     DEFAULT_COMPACT_MINUTE,
@@ -129,6 +132,7 @@ class DreameSF25Modes:
         data = await self._store.async_load() or {}
         self.lid_count = int(data.get("lid_count", 0))
         self.virtual_mode = data.get("virtual_mode")
+        self._owns_program = self.virtual_mode is not None
         self._virtual_until = float(data.get("virtual_until", 0) or 0)
         self.compact_hour = int(data.get("compact_hour", DEFAULT_COMPACT_HOUR))
         self.compact_minute = int(data.get("compact_minute", DEFAULT_COMPACT_MINUTE))
@@ -147,9 +151,9 @@ class DreameSF25Modes:
                 )
                 self._schedule_expiry(remaining)
             else:
-                # venció mientras HA estaba parado: cerramos ya
-                _LOGGER.info("El modo %s vencio durante el reinicio; parando", self.virtual_mode)
-                await self._async_finish_virtual()
+                # Do not write before the first refresh has confirmed what is running.
+                _LOGGER.info("El modo %s vencio durante el reinicio; verificando estado", self.virtual_mode)
+                self._schedule_expiry(1)
 
     async def async_unload(self) -> None:
         self._cancel_timer()
@@ -213,39 +217,53 @@ class DreameSF25Modes:
 
     async def _async_expired(self, _now) -> None:
         _LOGGER.info("Modo %s completado; parando el aparato", self.virtual_mode)
-        await self._async_finish_virtual()
+        try:
+            await self._async_finish_virtual()
+        except Exception:
+            _LOGGER.exception("No se pudo confirmar la parada del modo virtual; reintentando")
+            self._schedule_expiry(60)
 
     async def _async_finish_virtual(self) -> None:
         """Detiene el aparato y cierra el modo virtual.
 
-        Se conserva _owns_program para que el 'fin de programa' que provocara
-        esta parada NO se confunda con el final de un programa real.
+        Verifica que el aparato siga en nuestra autolimpieza antes de pararlo.
         """
+        # A user may have switched programs from the Dreame app while HA was
+        # restarting. Only stop a self-clean cycle that we still own.
+        await self.coordinator.async_request_refresh()
+        program = _as_int((self.coordinator.data or {}).get(PROP_PROGRAM))
+        if program is None:
+            raise HomeAssistantError("No se pudo verificar el programa activo")
+        if self._owns_program and program == _PROGRAM_SELF_CLEAN:
+            await self._async_set_program(_PROGRAM_IDLE)
         self._cancel_timer()
         self.virtual_mode = None
         self._virtual_until = 0.0
         self._virtual_start_remaining = None
-        await self._async_set_program(_PROGRAM_IDLE)
+        self._owns_program = False
         await self._async_save()
         await self.coordinator.async_request_refresh()
 
     # -------------------------------------------------------------------- ordenes
     async def _async_set_program(self, value: int) -> None:
         siid, piid = PROP_PROGRAM
+        await self.hass.async_add_executor_job(
+            self.coordinator.client.set_property, siid, piid, value
+        )
         self._command_at = time.time()
-        try:
-            await self.hass.async_add_executor_job(
-                self.coordinator.client.set_property, siid, piid, value
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.error("No se pudo escribir el programa %s: %s", value, err)
 
     async def async_start_virtual(self, mode: str) -> None:
         """Arranca Remover o Compactar (autolimpieza acotada)."""
+        if not self.coordinator.entry.options.get(CONF_VIRTUAL_MODES, False):
+            raise HomeAssistantError("Virtual modes are disabled in the integration options")
+        await self.coordinator.async_request_refresh()
+        program = _as_int((self.coordinator.data or {}).get(PROP_PROGRAM))
+        if program != _PROGRAM_IDLE:
+            raise HomeAssistantError("The SF25 must be idle before starting a virtual mode")
         duration = VIRTUAL_DURATIONS[mode]
+        await self._async_set_program(_PROGRAM_SELF_CLEAN)
         self._owns_program = True
         self._virtual_start_remaining = None
-        await self._async_set_program(_PROGRAM_SELF_CLEAN)
         self.virtual_mode = mode
         self._virtual_until = time.time() + duration
         self._schedule_expiry(duration)
@@ -417,9 +435,15 @@ class DreameSF25Modes:
         self.coordinator.async_update_listeners()
         _LOGGER.debug("Tapa cerrada; aperturas acumuladas: %s", self.lid_count)
 
+        if not (
+            self.coordinator.entry.options.get(CONF_AUTO_MODES, False)
+            and self.coordinator.entry.options.get(CONF_VIRTUAL_MODES, False)
+        ):
+            return
+
         if self.virtual_mode is not None:
             return  # ya estamos removiendo/compactando: no reiniciar ni cancelar
-        if program is not None and program != _PROGRAM_IDLE:
+        if program != _PROGRAM_IDLE:
             return  # hay un programa en marcha: no interrumpimos
         if self.lid_count >= LID_COUNT_THRESHOLD:
             _LOGGER.info(
@@ -430,12 +454,17 @@ class DreameSF25Modes:
 
     async def _async_daily_compact(self, _now) -> None:
         """Disparo diario de Compactar a la hora configurada."""
+        if not (
+            self.coordinator.entry.options.get(CONF_AUTO_MODES, False)
+            and self.coordinator.entry.options.get(CONF_VIRTUAL_MODES, False)
+        ):
+            return
         if self.lid_count < LID_COUNT_THRESHOLD:
             return
         if self.virtual_mode is not None:
             return
         program = _as_int((self.coordinator.data or {}).get(PROP_PROGRAM))
-        if program is not None and program != _PROGRAM_IDLE:
+        if program != _PROGRAM_IDLE:
             _LOGGER.info(
                 "%02d:%02d con %s aperturas, pero hay un programa en marcha: se omite Compactar",
                 self.compact_hour,

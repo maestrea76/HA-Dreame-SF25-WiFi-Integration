@@ -8,6 +8,9 @@ DOMAIN: Final = "dreame_sf25"
 # Config entry
 CONF_REGION: Final = "region"
 CONF_DID: Final = "did"
+CONF_AUTO_MODES: Final = "auto_modes"
+CONF_SAFETY_STOP: Final = "safety_stop"
+CONF_VIRTUAL_MODES: Final = "virtual_modes"
 
 DEFAULT_REGION: Final = "eu"
 REGIONS: Final = ["eu", "cn", "us", "ru", "sg", "kr"]

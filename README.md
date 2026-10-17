@@ -71,6 +71,11 @@ safety net (every 5 min while push is alive, 30 s if it drops).
 > If you signed up with **Google/Apple**, first set a password in the Dreamehome
 > app via *"Forgot password"* (using your Google email).
 
+The integration options control three independent behaviors: automatic Stir/Compact
+starts, virtual Stir/Compact programs in the program selector, and the cloud-based
+temperature stop. All three are **off by default**. The appliance's own controls
+and safety mechanisms work independently of these Home Assistant options.
+
 ## Entities
 
 **Sensors**
@@ -93,16 +98,23 @@ safety net (every 5 min while push is alive, 30 s if it drops).
 |---|---|---|
 | Program (select) | 2.3 | Stopped / Grind / Extra drying / Self-clean / Stir / Compact |
 | Pause / Resume (button) | 2.10 | Pauses (0) / resumes (1) the running program |
+| Open lid (button) | 6.26 | Available in HA only after fresh state confirms standby, stopped program and at most 40 °C |
 | Child lock (switch) | 6.10 | on/off (only effective while a cycle runs) |
 | Silent mode (switch) | 6.17 | on/off |
 
 > Note: writes only apply while the device is **awake**; in suspend mode
 > (status = suspended) they are ignored and the integration raises an error.
 
+The 40 °C limit is a conservative **Home Assistant remote-control guard**, not a
+temperature limit reported by the SF25. The physical lid control can behave
+differently. HA reads the device again immediately before sending its lid command;
+missing or invalid readings block that command.
+
 ## Modes
 
 The appliance has three programs of its own; the integration adds two **virtual
-modes** built on top of self-clean, bounded in time:
+modes** built on top of self-clean, bounded in time. Enable them in the integration
+options before they appear in the program selector:
 
 | Mode | What it does | Duration |
 |---|---|---|
@@ -112,7 +124,8 @@ modes** built on top of self-clean, bounded in time:
 | **Stir** | Self-clean, stopped early | **10 min** |
 | **Compact** | Self-clean, stopped early | **1 h** |
 
-**Automatic triggers** (based on a lid-opening counter kept by the integration):
+**Optional automatic triggers** (based on a lid-opening counter kept by the
+integration; disabled until enabled in the integration options):
 
 - **Stir** — when the lid closes and at least **3 openings** have accumulated.
 - **Compact** — daily at a **configurable time** (default 15:00), if at least 3
@@ -131,8 +144,9 @@ use their own temperature limit (120 °C).
 
 ## Temperature safety stop
 
-The integration watches the temperature on every update and **stops the device**
-(program → stopped) if it exceeds the limit for the running program:
+If enabled in the integration options, the integration watches the temperature on
+every update and **stops the device** (program → stopped) if it exceeds the limit
+for the running program:
 
 | Program | Limit |
 |---|---:|
@@ -244,6 +258,11 @@ como red de seguridad (cada 5 min con el push vivo, 30 s si se cae).
 > Si te registraste con **Google/Apple**, primero crea una contraseña en la app
 > Dreamehome con *"He olvidado mi contraseña"* (usando tu email de Google).
 
+Las opciones de la integración controlan por separado el inicio automático de
+Remover/Compactar, los modos virtuales en el selector y la parada por temperatura
+desde la nube. Las tres están **desactivadas por defecto**. Los controles y las
+protecciones propios del aparato funcionan independientemente de estas opciones.
+
 ## Entidades
 
 **Sensores**
@@ -266,16 +285,23 @@ como red de seguridad (cada 5 min con el push vivo, 30 s si se cae).
 |---|---|---|
 | Programa (select) | 2.3 | Parado / Triturar / Secado extra / Autolimpieza / Remover / Compactar |
 | Pausar / Reanudar (button) | 2.10 | Pausa (0) / reanuda (1) el programa en marcha |
+| Abrir tapa (button) | 6.26 | Disponible en HA solo tras confirmar espera, programa detenido y 40 °C como máximo |
 | Bloqueo infantil (switch) | 6.10 | on/off (solo efectivo con ciclo en marcha) |
 | Modo silencio (switch) | 6.17 | on/off |
 
 > Nota: las escrituras solo se aplican con el aparato **despierto**; en modo
 > suspensión (estado = suspensión) se ignoran y la integración avisa con un error.
 
+El límite de 40 °C es una precaución para el **control remoto desde Home Assistant**,
+no un límite indicado por el SF25. El control físico de la tapa puede comportarse
+de otra manera. HA vuelve a leer el aparato justo antes de enviar la orden; si
+falta alguna lectura o es inválida, la orden se bloquea.
+
 ## Modos
 
 El aparato tiene tres programas propios; la integración añade dos **modos
-virtuales** construidos sobre la autolimpieza, acotados en el tiempo:
+virtuales** construidos sobre la autolimpieza, acotados en el tiempo. Hay que
+habilitarlos en las opciones para que aparezcan en el selector:
 
 | Modo | Qué hace | Duración |
 |---|---|---|
@@ -285,7 +311,8 @@ virtuales** construidos sobre la autolimpieza, acotados en el tiempo:
 | **Remover** | Autolimpieza, parada antes | **10 min** |
 | **Compactar** | Autolimpieza, parada antes | **1 h** |
 
-**Disparos automáticos** (según un contador de aperturas de tapa que lleva la integración):
+**Disparos automáticos opcionales** (según un contador de aperturas de tapa que
+lleva la integración; desactivados hasta habilitarlos en las opciones):
 
 - **Remover** — al cerrarse la tapa habiendo acumulado **3 aperturas** o más.
 - **Compactar** — a diario a una **hora configurable** (por defecto 15:00), si hay
@@ -304,8 +331,9 @@ temperatura (120 °C).
 
 ## Parada de seguridad por temperatura
 
-La integración vigila la temperatura en cada actualización y **detiene el aparato**
-(programa → parado) si supera el límite del programa en curso:
+Si se habilita en las opciones, la integración vigila la temperatura en cada
+actualización y **detiene el aparato** (programa → parado) si supera el límite del
+programa en curso:
 
 | Programa | Límite |
 |---|---:|
