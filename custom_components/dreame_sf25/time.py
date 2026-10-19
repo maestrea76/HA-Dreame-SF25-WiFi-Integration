@@ -40,6 +40,7 @@ class DreameSF25CompactTime(CoordinatorEntity[DreameSF25Coordinator], TimeEntity
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property

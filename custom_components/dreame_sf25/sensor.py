@@ -208,6 +208,7 @@ class DreameSF25Sensor(CoordinatorEntity[DreameSF25Coordinator], SensorEntity):
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property
@@ -273,6 +274,7 @@ class DreameSF25PowerSensor(CoordinatorEntity[DreameSF25Coordinator], SensorEnti
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
         # (instante monotono, Wh) en cada cambio del contador
         self._samples: deque[tuple[float, int]] = deque()

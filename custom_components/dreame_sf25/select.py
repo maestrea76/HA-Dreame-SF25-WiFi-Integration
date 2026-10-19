@@ -57,6 +57,7 @@ class DreameSF25ProgramSelect(CoordinatorEntity[DreameSF25Coordinator], SelectEn
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property

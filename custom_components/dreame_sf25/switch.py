@@ -75,6 +75,7 @@ class DreameSF25Switch(CoordinatorEntity[DreameSF25Coordinator], SwitchEntity):
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property

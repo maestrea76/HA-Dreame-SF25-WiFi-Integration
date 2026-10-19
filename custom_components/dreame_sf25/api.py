@@ -70,6 +70,7 @@ class DreameSF25Client:
         self.bind_host: str | None = None
         self.model: str | None = None
         self.master_uid: str | None = None    # masterUid del dispositivo (topic MQTT)
+        self.firmware: str | None = None      # version de firmware ('ver' de listV2)
 
     # ------------------------------------------------------------ Propiedades
     @property
@@ -199,6 +200,7 @@ class DreameSF25Client:
                 self.bind_host = d.get("bindDomain")
                 self.model = model
                 self.master_uid = d.get("masterUid")
+                self.firmware = d.get("ver")
                 return d
         raise DreameApiError("No se encontro el dispositivo SF25 en la cuenta")
 
