@@ -11,6 +11,7 @@ from homeassistant.components.switch import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -52,7 +53,9 @@ async def async_setup_entry(
 ) -> None:
     """Crea los switches."""
     coordinator = entry.runtime_data
-    async_add_entities(DreameSF25Switch(coordinator, desc) for desc in SWITCHES)
+    entities: list[SwitchEntity] = [DreameSF25Switch(coordinator, desc) for desc in SWITCHES]
+    entities.append(DreameSF25ScheduledCycleSwitch(coordinator))
+    async_add_entities(entities)
 
 
 class DreameSF25Switch(CoordinatorEntity[DreameSF25Coordinator], SwitchEntity):
@@ -107,3 +110,34 @@ class DreameSF25Switch(CoordinatorEntity[DreameSF25Coordinator], SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._async_set(0)
+
+
+class DreameSF25ScheduledCycleSwitch(CoordinatorEntity[DreameSF25Coordinator], SwitchEntity):
+    """Activa el triturado programado diario (estado propio de la integracion)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "scheduled_cycle"
+    _attr_icon = "mdi:calendar-clock"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: DreameSF25Coordinator) -> None:
+        super().__init__(coordinator)
+        did = coordinator.client.did
+        self._attr_unique_id = f"{did}_scheduled_cycle"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(did))},
+            manufacturer="Dreame",
+            model=coordinator.client.model or TARGET_MODEL,
+            name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.modes.scheduled_cycle
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.modes.async_set_scheduled_cycle(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.modes.async_set_scheduled_cycle(False)

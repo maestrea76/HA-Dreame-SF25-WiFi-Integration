@@ -101,6 +101,9 @@
       },
       "silent_mode": {
         "name": "Silent mode"
+      },
+      "scheduled_cycle": {
+        "name": "Scheduled grinding"
       }
     },
     "number": {
@@ -111,6 +114,9 @@
     "time": {
       "compact_time": {
         "name": "Compact time"
+      },
+      "cycle_time": {
+        "name": "Scheduled grinding time"
       }
     }
   },

@@ -9,6 +9,8 @@ dos modos propios sobre la autolimpieza, acotandola en el tiempo:
 Disparos automaticos:
   - Remover  : al cerrar la tapa, si se han acumulado >= 3 aperturas.
   - Compactar: a la hora configurada (por defecto 15:00), con >= 3 aperturas.
+  - Triturado programado (interruptor propio, desactivado por defecto): ciclo
+    completo a la hora configurada (p.ej. horas valle), con >= 1 apertura.
 
 Contador de aperturas: se reinicia cuando termina de forma natural cualquier
 programa propio del aparato (triturado, secado extra o autolimpieza). Cuenta
@@ -41,8 +43,11 @@ from .const import (
     CONF_AUTO_MODES,
     CONF_VIRTUAL_MODES,
     COMMAND_GRACE,
+    CYCLE_MIN_OPENINGS,
     DEFAULT_COMPACT_HOUR,
     DEFAULT_COMPACT_MINUTE,
+    DEFAULT_CYCLE_HOUR,
+    DEFAULT_CYCLE_MINUTE,
     DOMAIN,
     LID_COUNT_THRESHOLD,
     NATURAL_END_MARGIN,
@@ -85,6 +90,10 @@ class DreameSF25Modes:
         # hora del disparo diario de Compactar (editable desde HA)
         self.compact_hour: int = DEFAULT_COMPACT_HOUR
         self.compact_minute: int = DEFAULT_COMPACT_MINUTE
+        # triturado programado (opcional, desactivado por defecto)
+        self.cycle_hour: int = DEFAULT_CYCLE_HOUR
+        self.cycle_minute: int = DEFAULT_CYCLE_MINUTE
+        self.scheduled_cycle: bool = False
 
         # True mientras el programa que corre en el aparato lo lanzamos nosotros
         # (Remover/Compactar). Sirve para no confundir su final con el de un
@@ -107,6 +116,7 @@ class DreameSF25Modes:
 
         self._unsub_timer = None
         self._unsub_daily = None
+        self._unsub_cycle = None
 
     @property
     def virtual_remaining_minutes(self) -> int | None:
@@ -136,10 +146,14 @@ class DreameSF25Modes:
         self._virtual_until = float(data.get("virtual_until", 0) or 0)
         self.compact_hour = int(data.get("compact_hour", DEFAULT_COMPACT_HOUR))
         self.compact_minute = int(data.get("compact_minute", DEFAULT_COMPACT_MINUTE))
+        self.cycle_hour = int(data.get("cycle_hour", DEFAULT_CYCLE_HOUR))
+        self.cycle_minute = int(data.get("cycle_minute", DEFAULT_CYCLE_MINUTE))
+        self.scheduled_cycle = bool(data.get("scheduled_cycle", False))
         self._prog_run = data.get("prog_run")
         self._last_program = data.get("last_program")
 
         self._schedule_daily()
+        self._schedule_cycle()
 
         if self.virtual_mode:
             remaining = self._virtual_until - time.time()
@@ -160,6 +174,9 @@ class DreameSF25Modes:
         if self._unsub_daily is not None:
             self._unsub_daily()
             self._unsub_daily = None
+        if self._unsub_cycle is not None:
+            self._unsub_cycle()
+            self._unsub_cycle = None
         await self._async_save()
 
     async def _async_save(self) -> None:
@@ -170,6 +187,9 @@ class DreameSF25Modes:
                 "virtual_until": self._virtual_until,
                 "compact_hour": self.compact_hour,
                 "compact_minute": self.compact_minute,
+                "cycle_hour": self.cycle_hour,
+                "cycle_minute": self.cycle_minute,
+                "scheduled_cycle": self.scheduled_cycle,
                 # asi un reinicio de HA no pierde el programa en curso
                 "prog_run": self._prog_run,
                 "last_program": self._last_program,
@@ -196,6 +216,32 @@ class DreameSF25Modes:
         self.compact_minute = int(minute)
         self._schedule_daily()
         await self._async_save()
+
+    @callback
+    def _schedule_cycle(self) -> None:
+        """(Re)programa el disparo diario del triturado programado."""
+        if self._unsub_cycle is not None:
+            self._unsub_cycle()
+        self._unsub_cycle = async_track_time_change(
+            self.hass,
+            self._async_daily_cycle,
+            hour=self.cycle_hour,
+            minute=self.cycle_minute,
+            second=0,
+        )
+
+    async def async_set_cycle_time(self, hour: int, minute: int) -> None:
+        """Cambia la hora del triturado programado."""
+        self.cycle_hour = int(hour)
+        self.cycle_minute = int(minute)
+        self._schedule_cycle()
+        await self._async_save()
+
+    async def async_set_scheduled_cycle(self, enabled: bool) -> None:
+        """Activa/desactiva el triturado programado."""
+        self.scheduled_cycle = bool(enabled)
+        await self._async_save()
+        self.coordinator.async_update_listeners()
 
     async def async_set_lid_count(self, value: int) -> None:
         """Fija el contador de aperturas (editable desde HA)."""
@@ -474,6 +520,34 @@ class DreameSF25Modes:
             return
         _LOGGER.info("Disparo diario con %s aperturas acumuladas: iniciando Compactar", self.lid_count)
         await self.async_start_virtual(PROGRAM_COMPACT)
+
+    async def _async_daily_cycle(self, _now) -> None:
+        """Triturado programado a la hora configurada (p.ej. horas valle)."""
+        if not self.scheduled_cycle:
+            return
+        if self.lid_count < CYCLE_MIN_OPENINGS:
+            _LOGGER.debug("Triturado programado omitido: no se abrio la tapa")
+            return
+        if self.virtual_mode is not None:
+            return
+        # estado fresco justo antes de escribir, como en los modos virtuales
+        await self.coordinator.async_request_refresh()
+        program = _as_int((self.coordinator.data or {}).get(PROP_PROGRAM))
+        if program != _PROGRAM_IDLE:
+            _LOGGER.info(
+                "%02d:%02d: programa en marcha o estado desconocido; se omite el triturado programado",
+                self.cycle_hour,
+                self.cycle_minute,
+            )
+            return
+        _LOGGER.info("Triturado programado con %s aperturas acumuladas: iniciando ciclo", self.lid_count)
+        # ciclo real del aparato: al completarse reinicia el contador como siempre
+        try:
+            await self._async_set_program(_PROGRAM_CYCLE)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.error("No se pudo lanzar el triturado programado: %s", err)
+            return
+        await self.coordinator.async_request_refresh()
 
 
 def _as_int(value: Any) -> int | None:

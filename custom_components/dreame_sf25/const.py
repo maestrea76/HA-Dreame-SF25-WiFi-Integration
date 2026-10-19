@@ -106,6 +106,12 @@ LID_COUNT_THRESHOLD: Final = 3         # aperturas de tapa necesarias
 # Hora por defecto de Compactar; editable desde HA (entidad "Hora de compactar")
 DEFAULT_COMPACT_HOUR: Final = 15
 DEFAULT_COMPACT_MINUTE: Final = 0
+
+# Triturado programado (desactivado por defecto): ciclo completo a diario a la
+# hora configurada (p.ej. en horas valle) si se abrio la tapa al menos una vez.
+DEFAULT_CYCLE_HOUR: Final = 0
+DEFAULT_CYCLE_MINUTE: Final = 0
+CYCLE_MIN_OPENINGS: Final = 1
 LID_COUNT_MAX: Final = 99              # tope de la entidad number
 
 # Un programa se considera COMPLETADO (y reinicia el contador) si se cumple

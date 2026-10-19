@@ -101,6 +101,9 @@
       },
       "silent_mode": {
         "name": "Leisemodus"
+      },
+      "scheduled_cycle": {
+        "name": "Geplantes Zerkleinern"
       }
     },
     "number": {
@@ -111,6 +114,9 @@
     "time": {
       "compact_time": {
         "name": "Uhrzeit für Verdichten"
+      },
+      "cycle_time": {
+        "name": "Uhrzeit des geplanten Zerkleinerns"
       }
     }
   },

@@ -101,6 +101,9 @@
       },
       "silent_mode": {
         "name": "Modo silencio"
+      },
+      "scheduled_cycle": {
+        "name": "Triturado programado"
       }
     },
     "number": {
@@ -111,6 +114,9 @@
     "time": {
       "compact_time": {
         "name": "Hora de compactar"
+      },
+      "cycle_time": {
+        "name": "Hora del triturado programado"
       }
     }
   },
