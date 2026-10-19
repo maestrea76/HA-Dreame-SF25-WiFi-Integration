@@ -50,7 +50,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DreameSF25ConfigEntry) -
     coordinator = DreameSF25Coordinator(hass, entry, client)
     # contador de aperturas y modos virtuales (Remover / Compactar)
     await coordinator.modes.async_load()
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        # async_load ya programo el disparo diario: sin esto, cada reintento de
+        # ConfigEntryNotReady dejaria un disparo huerfano mas
+        await coordinator.modes.async_unload()
+        raise
     # push en tiempo real; si falla, el coordinator sigue sondeando
     await coordinator.async_start_push()
 
