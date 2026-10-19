@@ -82,6 +82,17 @@
       },
       "humidity": {
         "name": "Humidity"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "error": {
+        "name": "Error",
+        "state": {
+          "none": "None",
+          "lid_open": "Lid open",
+          "other": "Unknown code (see the code attribute)"
+        }
       }
     },
     "switch": {

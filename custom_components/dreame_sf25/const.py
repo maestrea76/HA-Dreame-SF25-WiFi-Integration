@@ -35,6 +35,12 @@ DEFAULT_TENANT: Final = "000000"
 # Confirmadas por observacion en vivo:
 PROP_REMAINING_TIME: Final = (2, 11)   # minutos restantes de ciclo
 PROP_ENERGY_WH: Final = (3, 14)        # energia acumulada en Wh (crudos)
+
+# Potencia estimada: el aparato no la expone, solo el contador de Wh (1 Wh de
+# resolucion, empujado cada ~60 s en marcha). Se calcula la pendiente de los Wh
+# en una ventana deslizante; sin incremento durante POWER_IDLE_S se da 0 W.
+POWER_WINDOW_S: Final = 300
+POWER_IDLE_S: Final = 180
 PROP_HUMIDITY: Final = (3, 2)          # humedad relativa % (sube a ~100 al parar el secado)
 PROP_TEMPERATURE: Final = (3, 3)       # temperatura de camara C (se enfria al parar)
 PROP_CARBON_FILTER_PCT: Final = (4, 3)   # % de vida restante del filtro de carbon (82)
@@ -44,6 +50,16 @@ PROP_CARBON_FILTER_DAYS: Final = (4, 4)  # dias restantes para limpiar filtro de
 PROP_STATUS: Final = (2, 1)             # estado nativo (enum), ver STATUS_MAP
 PROP_RUNNING: Final = (2, 10)           # tri-estado: -1=apagado, 0=pausa, 1=marcha
 PROP_PROGRAM: Final = (2, 3)            # programa activo; ver PROGRAM_MAP
+PROP_ERROR: Final = (2, 2)              # codigo de aviso/fallo (0 = nada), ver ERROR_MAP
+
+# Codigo de aviso/fallo (2.2). Visto en un aparato real: 1 mientras la tapa
+# esta abierta (la pantalla muestra "open") y 0 al cerrarla. Ningun otro valor
+# observado aun: se exponen como "other" con el codigo bruto en `code`.
+ERROR_MAP: Final = {
+    0: "none",
+    1: "lid_open",
+}
+ERROR_OTHER: Final = "other"
 
 # Estado nativo del aparato (PROP_STATUS = 2.1). Se ira completando.
 STATUS_MAP: Final = {

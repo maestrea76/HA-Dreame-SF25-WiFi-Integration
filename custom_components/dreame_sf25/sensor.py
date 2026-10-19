@@ -1,8 +1,11 @@
 """Sensores del Dreame SF25."""
 from __future__ import annotations
 
+import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -14,20 +17,27 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfEnergy,
+    UnitOfPower,
     UnitOfTemperature,
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DreameSF25ConfigEntry
 from .const import (
     DOMAIN,
+    ERROR_MAP,
+    ERROR_OTHER,
+    POWER_IDLE_S,
+    POWER_WINDOW_S,
     PROP_CARBON_FILTER_DAYS,
     PROP_CARBON_FILTER_PCT,
     PROP_ENERGY_WH,
+    PROP_ERROR,
     PROP_HUMIDITY,
     PROP_REMAINING_TIME,
     PROP_STATUS,
@@ -43,6 +53,10 @@ def _map_status(v: Any) -> str:
         return STATUS_MAP.get(int(v), f"unknown_{v}")
     except (ValueError, TypeError):
         return f"unknown_{v}"
+
+
+def _map_error(v: Any) -> str:
+    return ERROR_MAP.get(int(v), ERROR_OTHER)
 
 
 def _remaining_minutes(coordinator) -> int | None:
@@ -147,6 +161,17 @@ SENSORS: tuple[DreameSF25SensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         prop=PROP_HUMIDITY,
     ),
+    DreameSF25SensorDescription(
+        key="error",
+        translation_key="error",
+        name="Error",
+        icon="mdi:alert-circle-outline",
+        device_class=SensorDeviceClass.ENUM,
+        options=[*ERROR_MAP.values(), ERROR_OTHER],
+        prop=PROP_ERROR,
+        value_fn=_map_error,
+        attrs_fn=lambda v: {"code": int(v)},
+    ),
 )
 
 
@@ -157,7 +182,10 @@ async def async_setup_entry(
 ) -> None:
     """Crea los sensores."""
     coordinator = entry.runtime_data
-    async_add_entities(DreameSF25Sensor(coordinator, desc) for desc in SENSORS)
+    async_add_entities(
+        [DreameSF25Sensor(coordinator, desc) for desc in SENSORS]
+        + [DreameSF25PowerSensor(coordinator)]
+    )
 
 
 class DreameSF25Sensor(CoordinatorEntity[DreameSF25Coordinator], SensorEntity):
@@ -219,3 +247,80 @@ class DreameSF25Sensor(CoordinatorEntity[DreameSF25Coordinator], SensorEntity):
         if self.entity_description.compute_fn is not None:
             return True
         return self.entity_description.prop in (self.coordinator.data or {})
+
+
+class DreameSF25PowerSensor(CoordinatorEntity[DreameSF25Coordinator], SensorEntity):
+    """Potencia media estimada a partir del contador de energia (3.14).
+
+    El aparato no informa de la potencia: se deriva de los Wh acumulados
+    (pendiente sobre POWER_WINDOW_S). Con 1 Wh de resolucion es una media, no
+    un valor instantaneo; sin incremento durante POWER_IDLE_S se da 0 W.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "power"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: DreameSF25Coordinator) -> None:
+        super().__init__(coordinator)
+        did = coordinator.client.did
+        self._attr_unique_id = f"{did}_power"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(did))},
+            manufacturer="Dreame",
+            model=coordinator.client.model or TARGET_MODEL,
+            name=coordinator.entry.title,
+        )
+        # (instante monotono, Wh) en cada cambio del contador
+        self._samples: deque[tuple[float, int]] = deque()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._sample()
+        # sin push no hay actualizaciones: reevaluamos para poder caer a 0 W
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._tick, timedelta(seconds=60))
+        )
+
+    @callback
+    def _tick(self, _now) -> None:
+        self.async_write_ha_state()
+
+    @callback
+    def _sample(self) -> None:
+        raw = (self.coordinator.data or {}).get(PROP_ENERGY_WH)
+        try:
+            wh = int(raw)
+        except (ValueError, TypeError):
+            return
+        if self._samples and wh < self._samples[-1][1]:
+            self._samples.clear()  # contador reiniciado
+        if not self._samples or wh != self._samples[-1][1]:
+            self._samples.append((time.monotonic(), wh))
+        last_t = self._samples[-1][0]
+        while len(self._samples) > 1 and self._samples[0][0] < last_t - POWER_WINDOW_S:
+            self._samples.popleft()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._sample()
+        super()._handle_coordinator_update()
+
+    @property
+    def native_value(self) -> float | None:
+        if not self._samples:
+            return None
+        last_t, last_wh = self._samples[-1]
+        if time.monotonic() - last_t > POWER_IDLE_S:
+            return 0.0
+        first_t, first_wh = self._samples[0]
+        if len(self._samples) < 2 or last_t <= first_t:
+            return None  # un solo punto: aun no hay pendiente
+        return round((last_wh - first_wh) * 3600 / (last_t - first_t), 1)
+
+    @property
+    def available(self) -> bool:
+        return super().available and PROP_ENERGY_WH in (self.coordinator.data or {})

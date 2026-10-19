@@ -82,6 +82,17 @@
       },
       "humidity": {
         "name": "Feuchtigkeit"
+      },
+      "power": {
+        "name": "Leistung"
+      },
+      "error": {
+        "name": "Fehler",
+        "state": {
+          "none": "Keiner",
+          "lid_open": "Deckel offen",
+          "other": "Unbekannter Code (siehe Attribut code)"
+        }
       }
     },
     "switch": {

@@ -82,6 +82,17 @@
       },
       "humidity": {
         "name": "Humedad"
+      },
+      "power": {
+        "name": "Potencia"
+      },
+      "error": {
+        "name": "Error",
+        "state": {
+          "none": "Ninguno",
+          "lid_open": "Tapa abierta",
+          "other": "Código desconocido (ver el atributo code)"
+        }
       }
     },
     "switch": {
