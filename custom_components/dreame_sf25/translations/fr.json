@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dreame SF25",
+        "description": "Saisissez les identifiants de votre compte Dreamehome. Si vous vous connectez avec Google, définissez d'abord un mot de passe via « Mot de passe oublié » dans l'application.",
+        "data": {
+          "email": "E-mail",
+          "password": "Mot de passe",
+          "region": "Région"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Identifiants incorrects.",
+      "cannot_connect": "Impossible de se connecter au cloud Dreame ou appareil introuvable.",
+      "unknown": "Erreur inattendue."
+    },
+    "abort": {
+      "already_configured": "Cet appareil est déjà configuré."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "running": {
+        "name": "En marche"
+      },
+      "lid": {
+        "name": "Couvercle"
+      }
+    },
+    "button": {
+      "pause": {
+        "name": "Pause"
+      },
+      "resume": {
+        "name": "Reprendre"
+      },
+      "open_lid": {
+        "name": "Ouvrir le couvercle"
+      },
+      "wake": {
+        "name": "Réveiller"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Programme",
+        "state": {
+          "idle": "Arrêté",
+          "cycle": "Broyage",
+          "self_clean": "Autonettoyage",
+          "stir": "Brassage",
+          "compact": "Compactage",
+          "extra": "Séchage prolongé"
+        }
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "État",
+        "state": {
+          "working": "En fonctionnement",
+          "standby": "En veille",
+          "suspended": "En sommeil"
+        }
+      },
+      "remaining_time": {
+        "name": "Temps restant"
+      },
+      "energy": {
+        "name": "Énergie"
+      },
+      "carbon_filter_pct": {
+        "name": "Durée de vie du filtre à charbon"
+      },
+      "carbon_filter_days": {
+        "name": "Filtre à charbon restant"
+      },
+      "temperature": {
+        "name": "Température"
+      },
+      "humidity": {
+        "name": "Humidité"
+      }
+    },
+    "switch": {
+      "child_lock": {
+        "name": "Sécurité enfants"
+      },
+      "silent_mode": {
+        "name": "Mode silencieux"
+      }
+    },
+    "number": {
+      "lid_count": {
+        "name": "Ouvertures du couvercle"
+      }
+    },
+    "time": {
+      "compact_time": {
+        "name": "Heure de compactage"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Actions automatiques",
+        "description": "Ces options sont désactivées par défaut. Les modes automatiques démarrent l'appareil après l'ouverture du couvercle ; l'arrêt sur température peut interrompre un programme en cours. Préparez le bac comme indiqué dans le manuel ; ces programmes utilisent l'autonettoyage.",
+        "data": {
+          "auto_modes": "Lancer automatiquement le brassage et le compactage",
+          "safety_stop": "Autoriser l'arrêt sur température via le cloud",
+          "virtual_modes": "Activer les programmes courts expérimentaux"
+        }
+      }
+    }
+  }
+}
