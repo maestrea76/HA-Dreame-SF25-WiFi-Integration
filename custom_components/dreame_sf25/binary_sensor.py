@@ -79,6 +79,7 @@ class DreameSF25BinarySensor(CoordinatorEntity[DreameSF25Coordinator], BinarySen
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property

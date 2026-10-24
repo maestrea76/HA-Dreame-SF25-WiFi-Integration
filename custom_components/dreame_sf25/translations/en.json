@@ -90,6 +90,17 @@
       },
       "humidity": {
         "name": "Humidity"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "error": {
+        "name": "Error",
+        "state": {
+          "none": "None",
+          "lid_open": "Lid open",
+          "other": "Unknown code (see the code attribute)"
+        }
       }
     },
     "switch": {
@@ -98,6 +109,9 @@
       },
       "silent_mode": {
         "name": "Silent mode"
+      },
+      "scheduled_cycle": {
+        "name": "Scheduled grinding"
       }
     },
     "number": {
@@ -108,6 +122,9 @@
     "time": {
       "compact_time": {
         "name": "Compact time"
+      },
+      "cycle_time": {
+        "name": "Scheduled grinding time"
       }
     }
   },

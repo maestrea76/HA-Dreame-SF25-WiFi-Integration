@@ -90,6 +90,17 @@
       },
       "humidity": {
         "name": "Humedad"
+      },
+      "power": {
+        "name": "Potencia"
+      },
+      "error": {
+        "name": "Error",
+        "state": {
+          "none": "Ninguno",
+          "lid_open": "Tapa abierta",
+          "other": "Código desconocido (ver el atributo code)"
+        }
       }
     },
     "switch": {
@@ -98,6 +109,9 @@
       },
       "silent_mode": {
         "name": "Modo silencio"
+      },
+      "scheduled_cycle": {
+        "name": "Triturado programado"
       }
     },
     "number": {
@@ -108,6 +122,9 @@
     "time": {
       "compact_time": {
         "name": "Hora de compactar"
+      },
+      "cycle_time": {
+        "name": "Hora del triturado programado"
       }
     }
   },

@@ -107,6 +107,7 @@ class DreameSF25Button(CoordinatorEntity[DreameSF25Coordinator], ButtonEntity):
             manufacturer="Dreame",
             model=coordinator.client.model or TARGET_MODEL,
             name=coordinator.entry.title,
+            sw_version=coordinator.client.firmware,
         )
 
     @property
