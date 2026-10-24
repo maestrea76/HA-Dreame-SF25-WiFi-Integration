@@ -9,6 +9,13 @@
           "password": "Mot de passe",
           "region": "Région"
         }
+      },
+      "reauth_confirm": {
+        "title": "Dreame SF25",
+        "description": "Le cloud Dreame a refusé le mot de passe de {email}. Saisissez le mot de passe actuel.",
+        "data": {
+          "password": "Mot de passe"
+        }
       }
     },
     "error": {
@@ -17,7 +24,8 @@
       "unknown": "Erreur inattendue."
     },
     "abort": {
-      "already_configured": "Cet appareil est déjà configuré."
+      "already_configured": "Cet appareil est déjà configuré.",
+      "reauth_successful": "Réauthentification réussie."
     }
   },
   "entity": {
@@ -82,6 +90,17 @@
       },
       "humidity": {
         "name": "Humidité"
+      },
+      "power": {
+        "name": "Puissance"
+      },
+      "error": {
+        "name": "Erreur",
+        "state": {
+          "none": "Aucune",
+          "lid_open": "Couvercle ouvert",
+          "other": "Code inconnu (voir l'attribut code)"
+        }
       }
     },
     "switch": {
@@ -90,6 +109,9 @@
       },
       "silent_mode": {
         "name": "Mode silencieux"
+      },
+      "scheduled_cycle": {
+        "name": "Broyage programmé"
       }
     },
     "number": {
@@ -100,6 +122,9 @@
     "time": {
       "compact_time": {
         "name": "Heure de compactage"
+      },
+      "cycle_time": {
+        "name": "Heure de broyage"
       }
     }
   },
