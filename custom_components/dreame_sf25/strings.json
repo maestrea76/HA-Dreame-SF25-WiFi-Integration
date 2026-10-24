@@ -9,6 +9,13 @@
           "password": "Contraseña",
           "region": "Región"
         }
+      },
+      "reauth_confirm": {
+        "title": "Dreame SF25",
+        "description": "La nube de Dreame ha rechazado la contraseña de {email}. Introduce la contraseña actual.",
+        "data": {
+          "password": "Contraseña"
+        }
       }
     },
     "error": {
@@ -17,7 +24,8 @@
       "unknown": "Error inesperado."
     },
     "abort": {
-      "already_configured": "Este dispositivo ya está configurado."
+      "already_configured": "Este dispositivo ya está configurado.",
+      "reauth_successful": "Reautenticación correcta."
     }
   },
   "entity": {

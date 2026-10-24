@@ -123,7 +123,16 @@ class DreameSF25Client:
 
     def _api(self, path: str, params: Any | None = None) -> dict:
         data = json.dumps(params, separators=(",", ":")).encode("utf-8") if params is not None else b""
-        return self._post(path, self._auth_headers(), data)
+        try:
+            return self._post(path, self._auth_headers(), data)
+        except DreameAuthError:
+            # Token rechazado antes de su caducidad (sesion cerrada desde la app,
+            # rotacion en la nube...): _ensure_token solo mira el reloj, asi que
+            # hacemos login de nuevo y reintentamos UNA vez. Si el login falla,
+            # la contrasena ya no vale y el error sube como DreameAuthError.
+            _LOGGER.debug("401 en %s; nuevo login y reintento", path)
+            self.login()
+            return self._post(path, self._auth_headers(), data)
 
     # ------------------------------------------------------------------ Auth
     def login(self) -> None:

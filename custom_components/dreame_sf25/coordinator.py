@@ -13,6 +13,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import DreameApiError, DreameAuthError, DreameSF25Client
@@ -46,6 +47,7 @@ class DreameSF25Coordinator(DataUpdateCoordinator[dict[tuple[int, int], Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name="Dreame SF25",
             update_interval=timedelta(seconds=SCAN_INTERVAL_POLL),
         )
@@ -190,7 +192,8 @@ class DreameSF25Coordinator(DataUpdateCoordinator[dict[tuple[int, int], Any]]):
                 self.client.get_properties, POLL_PROPERTIES
             )
         except DreameAuthError as err:
-            raise UpdateFailed(f"Autenticacion rechazada: {err}") from err
+            # contrasena rechazada incluso tras un login nuevo: HA pide reautenticar
+            raise ConfigEntryAuthFailed(f"Autenticacion rechazada: {err}") from err
         except DreameApiError as err:
             raise UpdateFailed(f"Error de la nube Dreame: {err}") from err
 
